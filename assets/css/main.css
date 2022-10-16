@@ -2182,7 +2182,7 @@ input, select, textarea {
 	padding-bottom: 6em;
 	padding-right: 1em;
 	width: inherit;
-	height: 220px;
+	height: 200px;
 	overflow-x: hidden;
 	overflow-y: scroll;
 }
