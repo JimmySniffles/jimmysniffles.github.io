@@ -2182,7 +2182,7 @@ input, select, textarea {
 	padding-bottom: 6em;
 	padding-right: 1em;
 	width: inherit;
-	height: 170px;
+	height: 180px;
 	overflow-x: hidden;
 	overflow-y: scroll;
 }
@@ -2200,12 +2200,12 @@ input, select, textarea {
 }
 
 ::-webkit-scrollbar-thumb {
-	background: #727475;  
+	background: #5c5d5e;  
 	border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-	background: #cccccc;  
+	background: #999999;  
 }
 
 /* Text Border style */
