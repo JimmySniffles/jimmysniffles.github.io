@@ -73,11 +73,11 @@ public class SC_MenuController : MonoBehaviour
         switch (menuItem)
         {
             case "begin":
-                audioController.PlayAudio("play", "Select", 0, false);
+                audioController.PlayAudio("play", "Select", false, 0);
                 StartCoroutine(gameController.SceneTransition("wipeIn", "SE_Testlevel", gameController.sceneTransitionSpeed));
                 break;
             case "return":
-                audioController.PlayAudio("play", "Select", 0, false);
+                audioController.PlayAudio("play", "Select", false, 0);
                 if (gameController.GetSaveData.levelProgress != null)
                 {
                     StartCoroutine(gameController.SceneTransition("wipeIn", gameController.GetSaveData.levelProgress, gameController.sceneTransitionSpeed));
@@ -88,29 +88,29 @@ public class SC_MenuController : MonoBehaviour
                 }
                 break;
             case "settings":
-                audioController.PlayAudio("play", "Navigate", 0, false);
+                audioController.PlayAudio("play", "Navigate", false, 0);
                 break;
             case "credits":
-                audioController.PlayAudio("play", "Select", 0, false);
+                audioController.PlayAudio("play", "Select", false, 0);
                 StartCoroutine(gameController.SceneTransition("wipeIn", "SE_Testlevel", gameController.sceneTransitionSpeed));
                 break;
             case "exit":
-                audioController.PlayAudio("play", "Select", 0, false);
+                audioController.PlayAudio("play", "Select", false, 0);
                 StartCoroutine(gameController.SceneTransition("exit", "", gameController.sceneTransitionSpeed));
                 break;
             case "pauseReturn":
-                audioController.PlayAudio("play", "Select", 0, false);
+                audioController.PlayAudio("play", "Select", false, 0);
                 pauseMenuUI.SetActive(false);
                 if (mobileInputUI != null) { mobileInputUI.SetActive(true); }
                 Time.timeScale = 1f;
                 GamePaused = false;
                 break;
             case "pauseRestart":
-                audioController.PlayAudio("play", "Select", 0, false);
+                audioController.PlayAudio("play", "Select", false, 0);
                 StartCoroutine(gameController.SceneTransition(gameController.sceneTransitionIn.ToString(), SceneManager.GetActiveScene().name, gameController.sceneTransitionSpeed));
                 break;
             case "pauseExit":
-                audioController.PlayAudio("play", "Select", 0, false);
+                audioController.PlayAudio("play", "Select", false, 0);
                 StartCoroutine(gameController.SceneTransition(gameController.sceneTransitionIn.ToString(), "SE_MainMenu", gameController.sceneTransitionSpeed));
                 break;
             default:

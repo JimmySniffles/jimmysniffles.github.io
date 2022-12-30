@@ -5,8 +5,8 @@ public class SC_HealthController : MonoBehaviour
 {
     #region Variables   
     [Header("Health")]
-    [Tooltip("Sets max health.")][Range(0, 100)][SerializeField] private float health = 100f;
-    [Tooltip("Gets and sets current health.")] public float CurrentHealth { get; private set; }
+    [Tooltip("Sets max health.")][Range(0, 100)][SerializeField] private float maxHealth;
+    [Tooltip("Gets and sets current health.")] public float CurrentHealth { get; set; }
     [field: Tooltip("Gets and sets invincibility.")][field: SerializeField] public bool Invincible { get; set; }
     #endregion
 
@@ -18,7 +18,7 @@ public class SC_HealthController : MonoBehaviour
     /// <summary> Set variables. </summary>
     private void Initialization()
     {
-        CurrentHealth = health;
+        CurrentHealth = maxHealth;
     }
     /// <summary> Set health by type, amount and duration ("+" add health), ("-" sub health), ("+=" add health overtime, secs), ("-=" sub health overtime, secs), ("++" add full health), ("--" sub full health). </summary>
     public IEnumerator SetHealth(string type, float amount, float duration)
@@ -27,7 +27,7 @@ public class SC_HealthController : MonoBehaviour
         {
             case "+": // Add health.
                 CurrentHealth += amount;
-                if (CurrentHealth >= health) { CurrentHealth = health; }
+                if (CurrentHealth >= maxHealth) { CurrentHealth = maxHealth; }
                 break;
             case "-": // Subtract health.
                 if (!Invincible)
@@ -39,13 +39,13 @@ public class SC_HealthController : MonoBehaviour
             case "+=": // Add health overtime.
                 while (duration > 0)
                 {
-                    if (CurrentHealth < health)
+                    if (CurrentHealth < maxHealth)
                     {
                         CurrentHealth += amount;
                     }
                     else
                     {
-                        CurrentHealth = health;
+                        CurrentHealth = maxHealth;
                     }                
                     yield return new WaitForSeconds(1f);
                     duration -= 1f;
@@ -71,7 +71,7 @@ public class SC_HealthController : MonoBehaviour
                 }
                 break;
             case "++": // Add full health.
-                CurrentHealth = health;
+                CurrentHealth = maxHealth;
                 break;
             case "--": // Subtract full health.
                 CurrentHealth = 0;

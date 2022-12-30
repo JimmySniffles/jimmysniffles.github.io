@@ -79,14 +79,14 @@ public class SC_DialogueController : MonoBehaviour
             if (dialogueStartDelay <= 0f && Input.GetButtonDown("Fire1") && dialogueSentenceTyped)
             {
                 currentDialogueIndex++;
-                audioController.PlayAudio("play", "Select", 0, false);
+                audioController.PlayAudio("play", "Select", false, 0);
                 DialogueNextLine();
             }
             else if (dialogueStartDelay <= 0f && Input.GetButtonDown("Fire1") && !dialogueSentenceTyped)
             {
                 StopAllCoroutines();
                 dialogueSentenceText.text = dialogueSentenceTyping;
-                audioController.PlayAudio("play", "Navigate", 0, false);
+                audioController.PlayAudio("play", "Navigate", false, 0);
                 dialogueFinishIcon.SetActive(true);
                 dialogueSentenceTyped = true;
             }
@@ -111,7 +111,7 @@ public class SC_DialogueController : MonoBehaviour
         playerController.InputDisabled = true;
         dialogueSentences.Clear();
         LeanTween.moveY(dialogueTransform, 0f, dialogueMoveSpeed).setEaseOutBack();
-        audioController.PlayAudio("play", "Dialogue Start", 0, false);
+        audioController.PlayAudio("play", "Dialogue Start", false, 0);
 
         if (!dialogueSpoken)
         {
@@ -160,7 +160,7 @@ public class SC_DialogueController : MonoBehaviour
         playerController.InputDisabled = false;
         dialogueFinishIcon.SetActive(false);
         LeanTween.moveY(dialogueTransform, dialogueStartYPosition, dialogueMoveSpeed).setEaseInOutBack();
-        audioController.PlayAudio("play", "Dialogue End", 0, false);
+        audioController.PlayAudio("play", "Dialogue End", false, 0);
     }
     /// <summary> Dialogue letters (characters) display iteratively. </summary>
     private IEnumerator DialogueTypeSentence(string sentence)
@@ -171,7 +171,7 @@ public class SC_DialogueController : MonoBehaviour
         foreach (char letter in sentence.ToCharArray())
         {
             dialogueSentenceText.text += letter;
-            audioController.PlayAudio("play", "Typing", 0, false);
+            audioController.PlayAudio("play", "Typing", false, 0);
             yield return new WaitForSeconds(dialogueTypeSpeed);
         }
         dialogueFinishIcon.SetActive(true);

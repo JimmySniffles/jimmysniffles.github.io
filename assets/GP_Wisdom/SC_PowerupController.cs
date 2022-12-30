@@ -19,7 +19,7 @@ public class SC_PowerupController : MonoBehaviour
     [Tooltip("List types of bush tucker.")] private enum Type { fingerLime, lemonMyrtle, midyimBerry, quandong, lemonAspen, muntries, cycad, deadlyNightshade, mistletoe, fingerCherry };
     [Tooltip("List of bush tucker stats.")][SerializeField] private BushTucker[] bushTuckerStats;
     [Tooltip("Gets enabled bush tucker stats change type.")] private string currentChangeType;
-    [Tooltip("Gets enabled bush tucker stats change increment type.")] private bool currentChangeIncrementType;
+    [Tooltip("Gets enabled bush tucker stats change increment type. True = increase, false = decrease.")] private bool currentChangeIncrementType;
     [Tooltip("Gets enabled bush tucker stats change amount.")] private float currentChangeAmount;
     [Tooltip("Gets enabled bush tucker stats change duration.")] private float currentChangeDuration;
 
@@ -68,8 +68,16 @@ public class SC_PowerupController : MonoBehaviour
                 currentChangeDuration = bushTuckerStats[(int)selectedBushTucker].changeDuration;
             }
         }
-        audioController.PlayAudio("play", "Pick", 0, true);
-        audioController.PlayAudio("play", "Consume", 0, true);
+        audioController.PlayAudio("play", "Pick", true, 0);
+        audioController.PlayAudio("play", "Consume", true, 0);
+        if (currentChangeIncrementType)
+        {
+            playerController.gameObject.GetComponent<SC_FlashController>().SetFlash("Heal");
+        }
+        else
+        {
+            playerController.gameObject.GetComponent<SC_FlashController>().SetFlash("Damage");
+        }
         playerController.SetStatsChange(currentChangeType, currentChangeIncrementType, currentChangeAmount, currentChangeDuration);
         Destroy(gameObject, 0.4f);
     }

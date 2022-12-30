@@ -70,7 +70,7 @@ public class SC_CheckpointController : MonoBehaviour
         if (collision.CompareTag("Player") && !setCheckpoint) 
         {
             gameController.RespawnPoint = transform.position;
-            audioController.PlayAudio("play", "Enabled", 0, true);
+            audioController.PlayAudio("play", "Enabled", true, 0);
             setCheckpoint = true;
             SetCheckpointSprite();
         }

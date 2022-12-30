@@ -66,8 +66,8 @@ public class SC_ProjectileController : MonoBehaviour
     private void Launch()
     {
         rigidBody.velocity = new Vector3(ProjectileDirection.x, ProjectileDirection.y, 0f).normalized * ProjectileSpeed;
-        audioController.PlayAudio("play", "Throw", 0, true);
-        audioController.PlayAudio("play", "In Air", 0, true);
+        audioController.PlayAudio("play", "Throw", true, 0);
+        audioController.PlayAudio("play", "In Air", true, 0);
     }
     /// <summary> Rotate projectile with consistent set rate in FixedUpdate. </summary>
     private void Rotate()
@@ -93,13 +93,13 @@ public class SC_ProjectileController : MonoBehaviour
             }
             if (!TeleportReady && currentTeleportDelay <= 0f && currentBouncingAmount <= bouncingAmount - 1 && currentProjectileDistance <= ProjectileDistance * ProjectileDistance - 5f)
             {
-                audioController.PlayAudio("play", "Teleport Up", 0, false);
+                audioController.PlayAudio("play", "Teleport Up", false, 0);
                 spriteRenderer.color = new Color(0f, 239f, 239f);
                 TeleportReady = true;
             }
             if (TeleportReady && currentTeleportDelay <= 0f && currentBouncingAmount > bouncingAmount - 1 || currentProjectileDistance > ProjectileDistance * ProjectileDistance - 5f)
             {
-                audioController.PlayAudio("play", "Teleport Down", 0, false);
+                audioController.PlayAudio("play", "Teleport Down", false, 0);
                 spriteRenderer.color = new Color(255f, 255f, 255f);
                 TeleportReady = false;
             }
@@ -136,8 +136,8 @@ public class SC_ProjectileController : MonoBehaviour
     {
         Instantiator.GetComponent<SC_PlayerController>().HasWeapon = true;
         Instantiator.GetComponent<SC_FlashController>().SetFlash("Interact");
-        audioController.PlayAudio("play", "Catch", 0, true);
-        audioController.PlayAudio("stop", "In Air", 0, true);
+        audioController.PlayAudio("play", "Catch", true, 0);
+        audioController.PlayAudio("stop", "In Air", true, 0);
         StartCoroutine(cameraController.CameraShake(0.08f, 0.01f));
         Destroy(gameObject, 0.05f);
     }
@@ -155,7 +155,7 @@ public class SC_ProjectileController : MonoBehaviour
         // Projectile collides with the ground and bounces.
         if (bouncing && CurrentState == State.thrown && collision.collider.gameObject.layer == LayerMask.NameToLayer("GroundTiles"))
         {
-            audioController.PlayAudio("play", "Hit Ground", 0, true);
+            audioController.PlayAudio("play", "Hit Ground", true, 0);
             StartCoroutine(cameraController.CameraShake(0.09f, 0.01f));
             Bounce(collision);
         }
@@ -168,7 +168,7 @@ public class SC_ProjectileController : MonoBehaviour
         if (collision.collider.gameObject.layer == LayerMask.NameToLayer("Interactables"))
         {
             collision.collider.gameObject.GetComponent<SC_FlashController>().SetFlash("Interact");
-            audioController.PlayAudio("play", "Hit Tucker", 0, true);
+            audioController.PlayAudio("play", "Hit Tucker", true, 0);
             StartCoroutine(cameraController.CameraShake(0.05f, 0.01f));
         }
     }
@@ -177,7 +177,7 @@ public class SC_ProjectileController : MonoBehaviour
         // Projectile collides with boundary.
         if (collision.gameObject.layer == LayerMask.NameToLayer("Default") && teleporting)
         {
-            audioController.PlayAudio("play", "Teleport Down", 0, false);
+            audioController.PlayAudio("play", "Teleport Down", false, 0);
             spriteRenderer.color = new Color(255f, 255f, 255f);
             TeleportReady = false;
             teleporting = false;
@@ -187,7 +187,8 @@ public class SC_ProjectileController : MonoBehaviour
         {
             StartCoroutine(collision.gameObject.GetComponent<SC_HealthController>().SetHealth("-", ProjectileDamage, 0f));
             collision.gameObject.GetComponent<SC_FlashController>().SetFlash("Damage");
-            audioController.PlayAudio("play", "Hit AI", 0, true);
+            collision.gameObject.GetComponent<SC_AIController>().Hit();
+            audioController.PlayAudio("play", "Hit AI", true, 0);
             StartCoroutine(cameraController.CameraShake(0.05f, 0.01f));
         }
     }

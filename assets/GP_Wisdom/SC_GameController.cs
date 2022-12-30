@@ -79,7 +79,7 @@ public class SC_GameController : MonoBehaviour
             StartCoroutine(SceneTransition(sceneTransitionOut.ToString(), "", sceneTransitionSpeed));
             for (int i = 0; i < sceneAudioCategory.Length; i++)
             {
-                StartCoroutine(audioController.FadeAudio("fadeIn", sceneAudioCategory[i], 0, true, sceneAudioFadeSpeed));
+                StartCoroutine(audioController.FadeAudio("fadeIn", sceneAudioCategory[i], true, 0, sceneAudioFadeSpeed));
             }  
         }
     }

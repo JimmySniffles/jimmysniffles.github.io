@@ -4,14 +4,11 @@ using UnityEngine;
 
 [RequireComponent(typeof(BoxCollider2D))]
 [RequireComponent(typeof(Rigidbody2D))]
-[RequireComponent(typeof(SC_HealthController))]
 public class SC_PlayerController : MonoBehaviour
 {
     #region Variables
-    [Tooltip("Sets types of states.")] private enum State { free, jump, wallJump, climb, dodge, attack, teleport, death };
-    [Tooltip("Gets and sets current state.")][SerializeField] private State currentState = State.free;
-    [Tooltip("Sets types of animations.")] private enum Animation { Idle, Run, Jump, Fall, Slide, Climb, Throw, AirThrow, Death, Interact, Push, Dodge, Sit };
-    [Tooltip("Gets and sets current animation.")] private Animation currentAnimation = Animation.Idle;
+    [Tooltip("Sets types of states.")] public enum State { free, jump, wallJump, climb, dodge, attack, teleport, death };
+    [Tooltip("Gets and sets current state.")][field: SerializeField] public State CurrentState { get; private set; }
 
     [Header("Movement")]
     [Tooltip("Sets movement speed.")][SerializeField] private float moveSpeed;
@@ -50,9 +47,9 @@ public class SC_PlayerController : MonoBehaviour
     [Tooltip("Gets BoxCollider2D component.")] private BoxCollider2D boxCollider;
     [Tooltip("Gets Rigidbody2D component.")] private Rigidbody2D rigidBody;
     [Tooltip("Gets SpriteRenderer component.")] private SpriteRenderer spriteRenderer;
-    [Tooltip("Gets Animator component.")] private Animator animator;
     [Tooltip("Gets HealthController script component.")] private SC_HealthController healthController;
     [Tooltip("Gets AudioController script component.")] private SC_AudioController audioController;
+    [Tooltip("Gets AnimationController script component.")] private SC_AnimationController animationController;
     [Tooltip("Gets MenuController script component to get game pause.")] private SC_MenuController menuController;
     [Tooltip("Gets GameController script component to get respawn.")] private SC_GameController gameController;
     [Tooltip("Gets CameraController script component.")] private SC_CameraController cameraController;
@@ -68,9 +65,11 @@ public class SC_PlayerController : MonoBehaviour
     [Tooltip("Gets running teleport Coroutine to prevent multiple.")] private Coroutine teleportCoroutine;
     [Tooltip("Gets if near an interactable to not attack.")] private bool nearInteractable;
     [Tooltip("Gets facing movement direction.")] private Vector2 facingDirection;
+    [Tooltip("Gets cursor direction to set projectile direction.")] private Vector2 cursorDirection;
     [Tooltip("Gets if input is disabled.")] public bool InputDisabled { get; set; }
     [Tooltip("Gets delay time the player can move after wall jumping.")] private bool canMove = true;
     [Tooltip("Gets if jump pressed to prevent jump animation cancelling.")] private bool jumpPressed;
+    [Tooltip("Gets if wall jump pressed to prevent jump animation cancelling.")] private bool wallJumpPressed;
     [Tooltip("Gets current jump hang time amount.")] private float currentJumpHang;
     [Tooltip("Gets current jump buffer amount.")] private float currentJumpBuffer;
     [Tooltip("Gets current wall climb timer.")] private float currentWallClimbStamina;
@@ -84,12 +83,14 @@ public class SC_PlayerController : MonoBehaviour
     [Tooltip("Gets jump release input.")] private bool jumpRelease;
     [Tooltip("Gets action release input.")] private bool actionRelease;
     [Tooltip("Gets action hold input.")] private bool actionHold;
+    [Tooltip("Gets dodge press input.")] private bool dodge;
     [Tooltip("Gets if UI mobile input is active.")] private bool mobileInput = false;
     [Tooltip("Gets mobile horizontal movement input.")] public float mobileMove { get; set; }
     [Tooltip("Gets mobile jump press input.")] public bool mobileJump { get; set; }
     [Tooltip("Gets mobile jump release input.")] public bool mobileJumpRelease { get; set; }
     [Tooltip("Gets mobile action release input.")] public bool mobileActionRelease { get; set; }
     [Tooltip("Gets mobile action hold input.")] public bool mobileActionHold { get; set; }
+    [Tooltip("Gets mobile dodge press input.")] public bool mobileDodge { get; set; }
     #endregion
 
     #region Call Functions
@@ -100,7 +101,7 @@ public class SC_PlayerController : MonoBehaviour
         GetCollisionDirection();
         SetGravity();
         SetGameTime();
-        switch (currentState)
+        switch (CurrentState)
         {
             case State.free: Free(); break;
             case State.jump: Jump(); break;
@@ -122,9 +123,9 @@ public class SC_PlayerController : MonoBehaviour
         boxCollider = GetComponent<BoxCollider2D>();
         rigidBody = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
-        animator = GetComponent<Animator>();
         healthController = GetComponent<SC_HealthController>();
         audioController = GetComponent<SC_AudioController>();
+        animationController = GetComponent<SC_AnimationController>();
         weaponPrefab = Resources.Load("PR_Boomerang");
         particlesTeleport = transform.GetChild(0).GetComponent<ParticleSystem>();
         cameraMain = GameObject.FindWithTag("MainCamera").GetComponent<Camera>();
@@ -136,26 +137,27 @@ public class SC_PlayerController : MonoBehaviour
         platformMask = LayerMask.GetMask("Platforms");
         interactMask = LayerMask.GetMask("Interactables");
         if (GameObject.FindWithTag("MobileUI") != null) { mobileInput = true; }
+        Physics2D.IgnoreLayerCollision(8, 10, true); // Ignore AI.
         HasWeapon = true;
     }
     /// <summary> Get input if not paused, dead or input disabled. </summary>
     private void GetInputs()
     {
-        if (healthController.CurrentHealth <= 0) { currentState = State.death; }
+        if (healthController.CurrentHealth <= 0) { CurrentState = State.death; }
 
-        if (!menuController.GamePaused && !InputDisabled && currentState != State.death)
+        if (!menuController.GamePaused && !InputDisabled && CurrentState != State.death)
         {
             moveHorizontal = mobileInput ? mobileMove : Input.GetAxisRaw("Horizontal");
             jump = mobileInput ? mobileJump : Input.GetButtonDown("Jump") || Input.GetKeyDown(KeyCode.UpArrow);
             jumpRelease = mobileInput ? mobileJumpRelease : Input.GetButtonUp("Jump") || Input.GetKeyUp(KeyCode.UpArrow);
             actionRelease = mobileInput ? mobileActionRelease : Input.GetButtonUp("Fire1");
-            actionHold = mobileInput ? mobileActionHold : Input.GetButton("Fire1") || Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow);
+            actionHold = mobileInput ? mobileActionHold : Input.GetButton("Fire1");
+            dodge = mobileInput ? mobileDodge : Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow);
 
             // Jump input buffer.
             if (jump)
             {
                 currentJumpBuffer = jumpBuffer;
-                jumpPressed = true;
             }
             else if (currentJumpBuffer > 0f)
             {
@@ -174,11 +176,12 @@ public class SC_PlayerController : MonoBehaviour
     {
         float interactRadius = 2f;
         facingDirection = new(moveHorizontal, 0f);
+        if (!onWall) { animationController.SetDirection(facingDirection); }
+
         onGround = Physics2D.BoxCast(boxCollider.bounds.center, boxCollider.bounds.size, 0f, Vector2.down, 0.2f, groundMask) || Physics2D.BoxCast(boxCollider.bounds.center, boxCollider.bounds.size, 0f, Vector2.down, 0.2f, platformMask);
         onWall = Physics2D.Linecast(boxCollider.bounds.center, new(boxCollider.bounds.center.x + 0.6f * facingDirection.x, boxCollider.bounds.center.y), groundMask) || 
                  Physics2D.Linecast(boxCollider.bounds.center, new(boxCollider.bounds.center.x + 0.6f * facingDirection.x, boxCollider.bounds.center.y), platformMask);
         nearInteractable = Physics2D.OverlapCircle(transform.position, interactRadius, interactMask) ? true : false;
-        if (!Mathf.Approximately(0f, moveHorizontal) && !onWall) { transform.rotation = moveHorizontal < 0 ? Quaternion.Euler(0, 180, 0) : Quaternion.identity; }
 
         if (onGround)
         {
@@ -192,7 +195,20 @@ public class SC_PlayerController : MonoBehaviour
         }
         if (onGround || onWall) { currentWeaponAirThrow = weaponAirThrow; }
         if (jumpPressed && !onGround) { jumpPressed = false; }
-        if (onWall && !onGround && currentState == State.free) { spriteRenderer.flipX = true; } else if (canMove) { spriteRenderer.flipX = false; }
+        if (wallJumpPressed && !onWall) { wallJumpPressed = false; }
+        if (onWall && !onGround && CurrentState == State.free) 
+        { 
+            spriteRenderer.flipX = true; 
+        } 
+        else if (canMove && Mathf.Round(moveHorizontal) != 0f && !onWall || CurrentState == State.climb) 
+        { 
+            spriteRenderer.flipX = false; 
+        }
+        if (animationController.Animator.GetCurrentAnimatorStateInfo(0).IsName(SC_AnimationController.Animation.Fall.ToString()) && onGround)
+        {
+            audioController.PlayAudio("play", "Land", true, 0);
+            StartCoroutine(cameraController.CameraShake(0.07f, 0.03f));
+        }
     }
     /// <summary> Set gravity (if throwing weapon or falling) and max gravity. </summary>
     private void SetGravity()
@@ -221,51 +237,65 @@ public class SC_PlayerController : MonoBehaviour
             Time.timeScale = 1f;
         }
     }
-    /// <summary> Set animation without interrupting itself. </summary>
-    private void SetAnimation(Animation newAnimation)
-    {
-        if (currentAnimation == newAnimation) { return; }
-        animator.Play(newAnimation.ToString());
-        currentAnimation = newAnimation;
-    }
-    /// <summary> Get current animation index frame (starts at 0). Formula link: https://answers.unity.com/questions/149717/check-the-current-frame-of-an-animation.html </summary>
-    private int GetAnimationFrame(int animationFrames)
-    {
-        int animationIndex = ((int)(animator.GetCurrentAnimatorStateInfo(0).normalizedTime * (animationFrames))) % animationFrames;
-        return animationIndex;
-    }
     /// <summary> Set movement with physics (using FixedUpdate) and animation. </summary>
     private void Move()
     {
-        if (currentState == State.free)
+        if (CurrentState == State.free)
         {
             if (canMove) { rigidBody.velocity = new(moveHorizontal * moveSpeed, rigidBody.velocity.y); }
-            if (moveHorizontal == 0f && onGround && !jumpPressed) // Idle.
+            if (Mathf.Round(moveHorizontal) == 0f && onGround && !jumpPressed) // Idle.
             {
-                SetAnimation(Animation.Idle);
+                animationController.SetAnimation(SC_AnimationController.Animation.Idle);
             }
-            if (moveHorizontal != 0f && onGround && !jumpPressed) // Run.
+            if (Mathf.Round(moveHorizontal) != 0f && onGround && !jumpPressed) // Run.
             {
-                SetAnimation(Animation.Run);
+                animationController.SetAnimation(SC_AnimationController.Animation.Run);
+                int currentFrame = animationController.GetAnimationFrame(16);
+                if (currentFrame == 4 || currentFrame == 12)
+                {
+                    audioController.PlayAudio("play", "Step", true, 0);
+                }
             }
         }
     }
     /// <summary> Transition to Jump, WallJump, Climb, Dodge, Attack, Teleport, Interact. Jump used in Update to avoid input delay in FixedUpdate. </summary>
     private void Free()
     {
-        if (rigidBody.velocity.y < 0f && !onGround && !onWall) { SetAnimation(Animation.Fall); }
-        if (onWall && !onGround)
+        float bufferY = -2f;
+        if (rigidBody.velocity.y < 0f && !onGround && !onWall) // Fall.
+        { 
+            animationController.SetAnimation(SC_AnimationController.Animation.Fall); 
+        } 
+        if (onWall && !onGround && !wallJumpPressed) // Slide.
         {
             rigidBody.velocity = new(rigidBody.velocity.x, Mathf.Clamp(rigidBody.velocity.y, -wallSlideSpeed, float.MaxValue));
-            SetAnimation(Animation.Slide);
+            animationController.SetAnimation(SC_AnimationController.Animation.Slide);
+            audioController.PlayAudio("play", "Slide", true, 0);
         }
-        if (currentJumpBuffer > 0 && currentJumpHang > 0) { currentState = State.jump; } // Jump.
-        if (jump && onWall && !onGround) { currentState = State.wallJump; } // Wall jump.
+        else if (animationController.Animator.GetCurrentAnimatorStateInfo(0).IsName(SC_AnimationController.Animation.Slide.ToString()) && !onGround)
+        {
+            animationController.SetAnimation(SC_AnimationController.Animation.Jump);     
+        }
+        else
+        {
+            audioController.PlayAudio("stop", "Slide", true, 0);
+        }
+        if (currentJumpBuffer > 0 && currentJumpHang > 0) { CurrentState = State.jump; } // Jump.
+        if (jump && onWall && !onGround) { CurrentState = State.wallJump; } // Wall jump.
         if (jumpRelease && rigidBody.velocity.y > 0) { rigidBody.velocity = new(rigidBody.velocity.x, rigidBody.velocity.y / jumpCut); } // Variable jump.
-        if (actionHold && onWall && currentWallClimbStamina > 0f) { currentState = State.climb; } // Climb.
-        if (actionHold && moveHorizontal != 0f && onGround && !onWall) { currentState = State.dodge; } // Dodge.
-        if (actionRelease && menuController.PauseDelay <= 0f && !onWall && HasWeapon && currentWeaponAirThrow > 0 && !nearInteractable) { currentState = State.attack; } // Attack.
-        if (actionRelease && menuController.PauseDelay <= 0f && !onWall && spawnedWeapon != null) { currentState = State.teleport; } // Teleport.
+        if (actionHold && onWall && currentWallClimbStamina > 0f) { CurrentState = State.climb; } // Climb.
+        if (dodge && moveHorizontal != 0f && onGround && !onWall) { CurrentState = State.dodge; } // Dodge.
+        if (actionRelease && menuController.PauseDelay <= 0f && !onWall && HasWeapon && currentWeaponAirThrow > 0 && !nearInteractable) // Attack.
+        {
+            cursorDirection = mobileInput && moveHorizontal != 0f && Input.touchCount >= 2 ? cameraMain.ScreenToWorldPoint(Input.GetTouch(1).rawPosition) - transform.position :
+                              cameraMain.ScreenToWorldPoint(Input.mousePosition) - transform.position;
+            if (!onGround || onGround && cursorDirection.y > bufferY) // Prevent spawning projectile into the ground.
+            {
+                CurrentState = State.attack;
+            }      
+        }
+        if (actionRelease && menuController.PauseDelay <= 0f && !onWall && spawnedWeapon != null) { CurrentState = State.teleport; } // Teleport.
+
         // Return camera zoom to start FOV if spawned weapon equals null.
         if (spawnedWeapon == null && !Mathf.Approximately(cameraMain.orthographicSize, cameraController.CameraStartFOV))
         {
@@ -276,26 +306,30 @@ public class SC_PlayerController : MonoBehaviour
     private void Jump()
     {
         rigidBody.velocity = new(rigidBody.velocity.x, jumpHeight);
-        SetAnimation(Animation.Jump);
+        animationController.SetAnimation(SC_AnimationController.Animation.Jump);
+        audioController.PlayAudio("play", "Move", true, 0);
+        jumpPressed = true;
         currentJumpBuffer = 0;
         currentJumpHang = 0;
-        currentState = State.free;
+        CurrentState = State.free;
     }
     /// <summary> Set wall jump. </summary>
     private void WallJump()
     {
         rigidBody.velocity = new(wallJumpSpeed * -moveHorizontal, wallJumpHeight);
-        SetAnimation(Animation.Jump);
+        animationController.SetAnimation(SC_AnimationController.Animation.Jump);
+        audioController.PlayAudio("play", "Move", true, 0);
         StartCoroutine(StatsChange("moveDelay", false, 0f, wallJumpDelay));
-        currentState = State.free;
+        wallJumpPressed = true;
+        CurrentState = State.free;
     }
     /// <summary> Set climb (climb wall for set time period). </summary>
     private void Climb()
     {
         rigidBody.velocity = new(rigidBody.velocity.x, wallClimbSpeed);
-        SetAnimation(Animation.Climb);
+        animationController.SetAnimation(SC_AnimationController.Animation.Climb);
         currentWallClimbStamina -= Time.deltaTime;
-        if (!actionHold || !onWall || currentWallClimbStamina <= 0f) { currentState = State.free; }
+        if (!actionHold || !onWall || currentWallClimbStamina <= 0f) { CurrentState = State.free; }
     }
     /// <summary> Set interact (check if near interactable). </summary>
     private void Interact()
@@ -305,51 +339,37 @@ public class SC_PlayerController : MonoBehaviour
     /// <summary> Set attack (throw projectile with reduced gravity). </summary>
     private void Attack()
     {
-        // Set projectile spawn direction whether second touch is used or not.
-        Vector3 cursorDirection;
         bool runThrow = false;
-        float bufferY = -2f;
-        cursorDirection = mobileInput && moveHorizontal != 0f && Input.touchCount >= 2 ? cameraMain.ScreenToWorldPoint(Input.GetTouch(1).rawPosition) - transform.position :
-                          cameraMain.ScreenToWorldPoint(Input.mousePosition) - transform.position;
-
-        // Prevent spawning projectile into the ground.
-        if (!onGround || onGround && cursorDirection.y > bufferY)
+        if (moveHorizontal == 0f && onGround)
         {
-            int currentFrame = GetAnimationFrame(6);
-            if (moveHorizontal == 0f && onGround)
-            {
-                SetAnimation(Animation.Throw);
-            }
-            if (moveHorizontal != 0f && onGround)
-            {
-                runThrow = true;
-            }
-            if (!onGround)
-            {
-                SetAnimation(Animation.AirThrow);
-            }
-            if (currentFrame == 4 && spawnedWeapon == null)
-            {
-                StartCoroutine(cameraController.CameraZoom(cameraController.CameraStartFOV + 1f, 6f));
-                spawnedWeapon = (GameObject)Instantiate(weaponPrefab, transform.position, transform.rotation);
-                var projectileController = spawnedWeapon.GetComponent<SC_ProjectileController>();
-                projectileController.Instantiator = gameObject;
-                projectileController.ProjectileSpeed = weaponSpeed;
-                projectileController.ProjectileDistance = weaponDistance;
-                projectileController.ProjectileDamage = weaponDamage;
-                projectileController.ProjectileDirection = cursorDirection;
-                HasWeapon = false;
-                currentWeaponAirThrow--;
-                currentWeaponAirGravityTime = weaponAirGravityTime;
-            }
-            if (runThrow || animator.GetCurrentAnimatorStateInfo(0).normalizedTime > 1f || animator.GetCurrentAnimatorStateInfo(0).IsName(Animation.AirThrow.ToString()) && onGround)
-            {
-                currentState = State.free;
-            }
+            animationController.SetAnimation(SC_AnimationController.Animation.Attack1);
         }
-        else
+        if (moveHorizontal != 0f && onGround)
         {
-            currentState = State.free;
+            runThrow = true;
+        }
+        if (!onGround)
+        {
+            animationController.SetAnimation(SC_AnimationController.Animation.AirAttack);
+        }
+        int currentFrame = animationController.GetAnimationFrame(6);
+        if ((currentFrame == 4 || runThrow) && spawnedWeapon == null)
+        {
+            StartCoroutine(cameraController.CameraZoom(cameraController.CameraStartFOV + 1f, 6f));
+            spawnedWeapon = (GameObject)Instantiate(weaponPrefab, transform.position, transform.rotation);
+            var projectileController = spawnedWeapon.GetComponent<SC_ProjectileController>();
+            projectileController.Instantiator = gameObject;
+            projectileController.ProjectileSpeed = weaponSpeed;
+            projectileController.ProjectileDistance = weaponDistance;
+            projectileController.ProjectileDamage = weaponDamage;
+            projectileController.ProjectileDirection = cursorDirection;
+            HasWeapon = false;
+            currentWeaponAirThrow--;
+            currentWeaponAirGravityTime = weaponAirGravityTime;
+        }
+        if (runThrow || animationController.Animator.GetCurrentAnimatorStateInfo(0).normalizedTime > 1f || (animationController.Animator.GetCurrentAnimatorStateInfo(0).IsName(SC_AnimationController.Animation.AirAttack.ToString()) && onGround))
+        {
+            CurrentState = State.free;
         }
     }
     /// <summary> Set teleport. </summary>
@@ -364,7 +384,7 @@ public class SC_PlayerController : MonoBehaviour
             }
             else
             {
-                currentState = State.free;
+                CurrentState = State.free;
             }
         }  
     }
@@ -377,7 +397,7 @@ public class SC_PlayerController : MonoBehaviour
         // Teleport Out
         canMove = false;
         currentWeaponAirGravityTime = weaponTeleportGravityTime;
-        audioController.PlayAudio("play", "Teleport Out", 0, false);
+        audioController.PlayAudio("play", "Teleport Out", false, 0);
         particlesTeleport.Play();
 
         while (transform.localScale.x != 0f)
@@ -397,7 +417,7 @@ public class SC_PlayerController : MonoBehaviour
 
         // Teleport In
         particlesTeleport.Play();
-        audioController.PlayAudio("play", "Teleport In", 0, false);
+        audioController.PlayAudio("play", "Teleport In", false, 0);
         while (transform.localScale.x != teleportOriginalScale.x)
         {
             timer += teleportScaleSpeed * Time.deltaTime;
@@ -407,7 +427,7 @@ public class SC_PlayerController : MonoBehaviour
         canMove = true;
         HasWeapon = true;
         teleportCoroutine = null;
-        currentState = State.free;
+        CurrentState = State.free;
     }
     /// <summary> Set dodge (combat roll animation with invincibility). </summary>
     private void Dodge()
@@ -415,16 +435,21 @@ public class SC_PlayerController : MonoBehaviour
         float direction = transform.rotation.y == 0f ? 1f : -1f;
         rigidBody.velocity = new(direction * dodgeSpeed, rigidBody.velocity.y);
         healthController.Invincible = true;
-        SetAnimation(Animation.Dodge);
-        int currentFrame = GetAnimationFrame(8);
-        if (currentFrame == 3)
+        animationController.SetAnimation(SC_AnimationController.Animation.Dodge);
+        int currentFrame = animationController.GetAnimationFrame(8);
+        if (currentFrame == 1)
         {
-            audioController.PlayAudio("play", "Land", 0, true);
+            audioController.PlayAudio("play", "Move", true, 0);
         }
-        if (animator.GetCurrentAnimatorStateInfo(0).IsName(Animation.Dodge.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime > 1f || !onGround)
+        if (currentFrame == 5)
+        {
+            audioController.PlayAudio("play", "Land", true, 0);
+            StartCoroutine(cameraController.CameraShake(0.1f, 0.01f));
+        }
+        if ((animationController.Animator.GetCurrentAnimatorStateInfo(0).IsName(SC_AnimationController.Animation.Dodge.ToString()) && animationController.Animator.GetCurrentAnimatorStateInfo(0).normalizedTime > 1f) || !onGround)
         {
             healthController.Invincible = false;
-            currentState = State.free;
+            CurrentState = State.free;
         }
     }
     /// <summary> Set death (stop movement, play death animation, move to respawn, reset health). </summary>
@@ -437,12 +462,12 @@ public class SC_PlayerController : MonoBehaviour
             Destroy(spawnedWeapon);
             HasWeapon = true;
         }
-        SetAnimation(Animation.Death);
-        if (animator.GetCurrentAnimatorStateInfo(0).IsName(Animation.Death.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime > 1f)
+        animationController.SetAnimation(SC_AnimationController.Animation.Death);
+        if (animationController.Animator.GetCurrentAnimatorStateInfo(0).IsName(SC_AnimationController.Animation.Death.ToString()) && animationController.Animator.GetCurrentAnimatorStateInfo(0).normalizedTime > 1f)
         {
             transform.position = gameController.RespawnPoint;
             StartCoroutine(healthController.SetHealth("++", 0f, 0f));
-            currentState = State.free;
+            CurrentState = State.free;
         }
     }
     /// <summary> Sets StatsChange by type, amount and duration to avoid coroutine cancelling from called destroyed classes ("moveDelay", "health", "movement", "jump", "climb", "thrown", "invincibility"). </summary>
@@ -524,23 +549,23 @@ public class SC_PlayerController : MonoBehaviour
                     wallClimbSpeed += amount; wallClimbStamina += amount;
                 }
                 break;
-            case "thrown":
+            case "weaponThrow":
                 if (increment)
                 {
-                    weaponSpeed += amount; weaponDistance += amount;
+                    weaponSpeed += amount; weaponDistance += amount; weaponDamage += amount;
                 }
                 else
                 {
-                    weaponSpeed -= amount; weaponDistance -= amount;
+                    weaponSpeed -= amount; weaponDistance -= amount; weaponDamage -= amount;
                 }
                 yield return new WaitForSeconds(duration);
                 if (increment)
                 {
-                    weaponSpeed -= amount; weaponDistance -= amount;
+                    weaponSpeed -= amount; weaponDistance -= amount; weaponDamage -= amount;
                 }
                 else
                 {
-                    weaponSpeed += amount; weaponDistance += amount;
+                    weaponSpeed += amount; weaponDistance += amount; weaponDamage += amount;
                 }
                 break;
             case "invincibility":

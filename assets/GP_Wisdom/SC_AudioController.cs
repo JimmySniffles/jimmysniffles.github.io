@@ -104,7 +104,7 @@ public class SC_AudioController : MonoBehaviour
         }
     }
     /// <summary> Play or stop specified or random audio clip ("play", "stop"). </summary>
-    public void PlayAudio(string type, string audioCategoryName, int index, bool random)
+    public void PlayAudio(string type, string audioCategoryName, bool random, int index)
     {
         // Gets audio category name within the audioManager array and sets it to the audio local variable.
         Audio audio = Array.Find(audioManager, audio => audio.audioCategory == audioCategoryName);
@@ -135,7 +135,7 @@ public class SC_AudioController : MonoBehaviour
         }
     }
     /// <summary> Fade in or out specified or random audio clip ("fadeIn" = fade in, "fadeOut" = fade out). </summary>
-    public IEnumerator FadeAudio(string type, string audioCategoryName, int index, bool random, float fadeSpeed)
+    public IEnumerator FadeAudio(string type, string audioCategoryName, bool random, int index, float fadeSpeed)
     {
         // Gets audio category name within the audioManager array and sets it to the audio local variable.
         Audio audio = Array.Find(audioManager, audio => audio.audioCategory == audioCategoryName);
